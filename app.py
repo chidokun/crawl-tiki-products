@@ -8,6 +8,7 @@ product_url = "https://tiki.vn/api/v2/products/{}"
 
 product_id_file = "./data/product-id.txt"
 product_data_file = "./data/product.txt"
+product_file = "./data/product.csv"
 
 
 def crawl_product_id():
@@ -41,8 +42,9 @@ def crawl_product(product_list=[]):
     product_detail_list = []
     for product_id in product_list:
         response = requests.get(product_url.format(product_id))
-        product_detail_list.append(response.text)
-        print("Crawl product: ", product_id, ": ", response.status_code)
+        if (response.status_code == 200):
+            product_detail_list.append(response.text)
+            print("Crawl product: ", product_id, ": ", response.status_code)
     return product_detail_list
 
 flatten_field = [ "badges", "inventory", "categories", "rating_summary", 
@@ -57,7 +59,7 @@ def adjust_product(product):
 
     for field in flatten_field:
         if field in e:
-            e[field] = json.dumps(e[field])
+            e[field] = json.dumps(e[field], ensure_ascii=False)
 
     return e
 
@@ -68,10 +70,46 @@ def save_raw_product(product_detail_list=[]):
     file.close()
     print("Save file: ", product_data_file)
 
+def load_raw_product():
+    file = open(product_data_file, "r")
+    return file.readlines()
+
+def save_product_list(product_json_list):
+    file = open(product_file, "w")
+    csv_writer = csv.writer(file)
+
+    count = 0
+    for p in product_json_list:
+        if p is not None:
+            if count == 0:
+                header = p.keys() 
+                csv_writer.writerow(header) 
+                count += 1
+            csv_writer.writerow(p.values())
+    file.close()
+    print("Save file: ", product_file)
 
 
+# crawl product id
+product_list, page = crawl_product_id()
 
+print("No. Page: ", page)
+print("No. Product ID: ", len(product_list))
 
+# save product id for backup
+save_product_id(product_list)
+
+# crawl detail for each product id
+product_list = crawl_product(product_list)
+
+# save product detail for backup
+save_raw_product(product_list)
+
+# product_list = load_raw_product()
+# flatten detail before converting to csv
+product_json_list = [adjust_product(p) for p in product_list]
+# save product to csv
+save_product_list(product_json_list)
 
 
 
