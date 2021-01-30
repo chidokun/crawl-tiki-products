@@ -1,14 +1,16 @@
-from bs4 import BeautifulSoup
 import requests
 import json
 import csv
+import re
 
-laptop_page_url = "https://tiki.vn/laptop/c8095?src=c.8095.hamburger_menu_fly_out_banner&_lc=&page={}"
+laptop_page_url = "https://tiki.vn/api/v2/products?limit=48&include=advertisement&aggregations=1&category=8095&page={}&urlKey=laptop"
 product_url = "https://tiki.vn/api/v2/products/{}"
 
 product_id_file = "./data/product-id.txt"
 product_data_file = "./data/product.txt"
 product_file = "./data/product.csv"
+
+headers = {"user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 11_1_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.96 Safari/537.36"}
 
 
 def crawl_product_id():
@@ -16,16 +18,21 @@ def crawl_product_id():
     i = 1
     while (True):
         print("Crawl page: ", i)
-        response = requests.get(laptop_page_url.format(i))
-        parser = BeautifulSoup(response.text, 'html.parser')
-
-        product_box = parser.findAll(class_="product-item")
-
-        if (len(product_box) == 0):
+        print(laptop_page_url.format(i))
+        response = requests.get(laptop_page_url.format(i), headers=headers)
+        
+        if (response.status_code != 200):
             break
 
-        for product in product_box:
-            product_list.append(product.get("data-id"))
+        products = json.loads(response.text)["data"]
+
+        if (len(products) == 0):
+            break
+
+        for product in products:
+            product_id = str(product["id"])
+            print("Product ID: ", product_id)
+            product_list.append(product_id)
 
         i += 1
 
@@ -41,7 +48,7 @@ def save_product_id(product_list=[]):
 def crawl_product(product_list=[]):
     product_detail_list = []
     for product_id in product_list:
-        response = requests.get(product_url.format(product_id))
+        response = requests.get(product_url.format(product_id), headers=headers)
         if (response.status_code == 200):
             product_detail_list.append(response.text)
             print("Crawl product: ", product_id, ": ", response.status_code)
@@ -59,7 +66,7 @@ def adjust_product(product):
 
     for field in flatten_field:
         if field in e:
-            e[field] = json.dumps(e[field], ensure_ascii=False)
+            e[field] = json.dumps(e[field], ensure_ascii=False).replace('\n','')
 
     return e
 
